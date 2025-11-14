@@ -7,3 +7,10 @@ stdImgDataServerLapCam.o
 testClientBlobDetector.o
 stdImgDataServerClientColorFilter.o
 stdImgDataServerClientBlobDetector.o
+stdImgDataServerClientBlobDetector
+stdImgDataServerClientColorFilter
+stdImgDataServerLapCam
+stdImgDataServerSim
+testClient
+testClientBlobDetector
+testOppBlobDetector
