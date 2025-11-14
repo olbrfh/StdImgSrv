@@ -1,0 +1,9 @@
+Socket.o
+testClient.o
+BlobDetector.o
+stdImgDataServerSim.o
+testOppBlobDetector.o
+stdImgDataServerLapCam.o
+testClientBlobDetector.o
+stdImgDataServerClientColorFilter.o
+stdImgDataServerClientBlobDetector.o
