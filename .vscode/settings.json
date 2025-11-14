@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stdImgDataServerClientBlobDetector.C": "cpp",
+        "BlobDetector.C": "cpp",
+        "cstdlib": "cpp",
+        "iostream": "cpp"
+    }
+}

@@ -25,10 +25,10 @@
 
 /**
  *
- * \file stdImgDataserverClientColorFilter.C
+ * \file stdImgDataserverClientBlobDetector.C
  *
  * \brief Captures images from device -1 (usually the webcam on your laptop)
- * and provides these data as standard image datat server.
+ * and provides these data as standard image data server.
  *
  */
 
@@ -45,8 +45,8 @@
 using namespace cv;
 
 // communication
-#include "Socket.H"  // For Socket, ServerSocket, and SocketException
-#include "StdImgDataServerProtocol.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/Socket.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/StdImgDataServerProtocol.H"  // For Socket, ServerSocket, and SocketException
 
 
 // On Linux, you must compile with the -D_REENTRANT option.  This tells
@@ -70,7 +70,7 @@ unsigned short THIS_SERVER_PORT_;
 unsigned short SOURCE_SERVER_PORT_;
 char          *SOURCE_SERVER_ADR_;
 
-const int CAMERA_COLOR_ = 0;
+const int IMAGE_COLOR_ = 0;
 
 
 void *runServer(void * genericPtr);
@@ -79,51 +79,36 @@ void HandleTCPClient(TCPSocket *sock);
 
 
 unsigned char *rawImageData_;
-unsigned char *sumFilterData_;
+unsigned char *monitorData_;
 int rawImageDataSize_;
 int imageWidth_;
 int imageHeight_;
+int colorValue_;
+unsigned char *blobCoord_;
+int blobCoordSize_ = 4;
 
-// view and filters
-char* winNameRawRGB_;
-IplImage *openCvImageRawRGB_;
+int detectTrash_;
 
-char* winNameSumFilter_;
-IplImage *openCvImageSumFilter_;
 
-char* winNameBfilter_;
-IplImage *openCvImageBfilter_;
+// image data raw data received (grey valued)
+IplImage *openCvImageRawGrey_;
 
-char* winNameRfilter_;
-IplImage *openCvImageRfilter_;
+// view
+char* winNameMonitor_;
+IplImage *openCvImageMinitor_;
 
-char* winNameGfilter_;
-IplImage *openCvImageGfilter_;
-
-int rFilterThreshR_ = 162;
-int rFilterThreshG_ = 143;
-int rFilterThreshB_ = 255;
-int gFilterThreshR_ = 126;
-int gFilterThreshG_ = 140;
-int gFilterThreshB_ = 209;
-int bFilterThreshR_ = 87;
-int bFilterThreshG_ = 255;
-int bFilterThreshB_ = 149;
-
-int sumPartB_ = 0;
-int sumPartG_ = 0;
-int sumPartR_ = 0;
-int sumAdd_   = 0;
 
 
 
 void printInfo(int argc, char *argv[]);
-int  sizeRawImageData(TCPSocket *socket, int *s, int *w, int *h);
+int  sizeRawImageData(TCPSocket *socket, int *s, int *w, int *h, int *color);
 bool updateImageData(TCPSocket *socket,unsigned char *storageImageData, int size);
+
+void createMonitorWin(char* winName,IplImage *openCvImg);
+void updateMonitor(IplImage *openCvImgMonitor,  unsigned char *imgD);
+//void updateMonitor(IplImage *openCvImgRawData, IplImage *openCvImgMonitor);
 void updateRawImageView(IplImage *openCvImageRaw, unsigned char *imgD);
 
-void createColorFilterWin(char color, char* winName,IplImage *openCvImg);
-void updateFilters(IplImage *openCvImgR,IplImage *openCvImgG,IplImage *openCvImgB,IplImage *openCvImgSum);
 
 /**
  *
@@ -150,38 +135,29 @@ int main(int argc, char *argv[]){
 		cout << "No server for image data.\n" << SOURCE_SERVER_ADR_ << endl << endl;
 		exit(1);
 	};
-	sizeRawImageData(dataSource_, &rawImageDataSize_, &imageWidth_,&imageHeight_);
+	sizeRawImageData(dataSource_, &rawImageDataSize_, &imageWidth_,&imageHeight_,&colorValue_);
 	if(rawImageDataSize_ < 1){
 		cout << "No data available, check image data server.\n";
 		exit(1);
 	};
 	printf("Receive image data %i x %i  total bytes %i \n", imageWidth_, imageHeight_, rawImageDataSize_);
 
+	if(colorValue_ > 0){
+		cout << "Image data must be grey value data.\n";
+		exit(1);
+	};
+
 	rawImageData_ = new unsigned char[rawImageDataSize_];
-	sumFilterData_ = new unsigned char[imageWidth_*imageHeight_]; // no RGB, just grey values
+	monitorData_  = new unsigned char[imageWidth_*imageHeight_]; // no RGB, just grey values
+	blobCoord_    = new unsigned char[blobCoordSize_];
 
 	//view
-	winNameRfilter_ = new char[16]; sprintf(winNameRfilter_,"%c filter",'R');
-	openCvImageRfilter_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,1);
-	createColorFilterWin('R',winNameRfilter_,openCvImageRfilter_);
+	winNameMonitor_ = new char[16]; sprintf(winNameMonitor_,"Blob Detector");
+	openCvImageMinitor_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,3);
+	createMonitorWin(winNameMonitor_,openCvImageMinitor_);
+	cvCreateTrackbar("thrash value" ,winNameMonitor_, &detectTrash_, 255, NULL );
 
-	winNameGfilter_ = new char[16]; sprintf(winNameGfilter_,"%c filter",'G');
-	openCvImageGfilter_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,1);
-	createColorFilterWin('G',winNameGfilter_,openCvImageGfilter_);
-
-	winNameBfilter_ = new char[16]; sprintf(winNameBfilter_,"%c filter",'B');
-	openCvImageBfilter_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,1);
-	createColorFilterWin('B',winNameBfilter_,openCvImageBfilter_);
-
-	winNameSumFilter_ = new char[16]; sprintf(winNameSumFilter_,"%cummed filter outputs",'S');
-	openCvImageSumFilter_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,1);
-	createColorFilterWin('S',winNameSumFilter_,openCvImageSumFilter_);
-
-
-	openCvImageRawRGB_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,3);
-	winNameRawRGB_ = new char[32];
-	strcpy(winNameRawRGB_, "Received Image");
-	cvNamedWindow(winNameRawRGB_, 0);
+	openCvImageRawGrey_ = cvCreateImage(cvSize(imageWidth_,imageHeight_),IPL_DEPTH_8U,1);
 
 
 
@@ -194,16 +170,11 @@ int main(int argc, char *argv[]){
 
 	int i=0;
 	while(updateImageData(dataSource_,rawImageData_,rawImageDataSize_)){
-
-		updateRawImageView(openCvImageRawRGB_,rawImageData_);
+		//updateRawImageView(openCvImageRawGrey_,rawImageData_);
 		accessBlocked_ = true;
-		updateFilters(openCvImageRfilter_,openCvImageGfilter_,openCvImageBfilter_,openCvImageSumFilter_);
+		updateMonitor(openCvImageMinitor_,rawImageData_);
 		accessBlocked_ = false;
-		cvShowImage(winNameRawRGB_,openCvImageRawRGB_);
-		cvShowImage(winNameRfilter_,openCvImageRfilter_);
-		cvShowImage(winNameGfilter_,openCvImageGfilter_);
-		cvShowImage(winNameBfilter_,openCvImageBfilter_);
-		cvShowImage(winNameSumFilter_,openCvImageSumFilter_);
+		cvShowImage(winNameMonitor_,openCvImageMinitor_);
 		cvWaitKey(2);
 	};
 
@@ -214,99 +185,203 @@ int main(int argc, char *argv[]){
 
 	delete dataSource_;
 	delete [] rawImageData_;
-	delete [] sumFilterData_;
+	delete [] monitorData_;
 	exit(0);
 };
 
+
 void updateRawImageView(IplImage *openCvImageRaw, unsigned char *imgD){
+/*
+	for(int i = 0; i < imageHeight_; i++){
+		for(int j = 0; j < imageWidth_; j++){
+			((uchar *)(openCvImageRaw->imageData + i*openCvImageRaw->widthStep))[j] =
+					imgD[(imageWidth_*i) + j];
+		};
+	};
+*/
+
+
 	for(int i = 0; i < imageHeight_; i++){
 		for(int j = 0; j < imageWidth_; j++){
 				((uchar *)(openCvImageRaw->imageData + i*openCvImageRaw->widthStep))[j*openCvImageRaw->nChannels + 0] =
-					imgD[3*((imageWidth_*i) + j) + 2]; // B
+						imgD[(imageWidth_*i) + j]; // B
 				((uchar *)(openCvImageRaw->imageData + i*openCvImageRaw->widthStep))[j*openCvImageRaw->nChannels + 1] =
-					imgD[3*((imageWidth_*i) + j) + 1]; // G
+						imgD[(imageWidth_*i) + j]; // G
 				((uchar *)(openCvImageRaw->imageData + i*openCvImageRaw->widthStep))[j*openCvImageRaw->nChannels + 2] =
-					imgD[3*((imageWidth_*i) + j) + 0]; // R
+						imgD[(imageWidth_*i) + j]; // R
 		};
 	};
-
 }
-void updateFilters(IplImage *openCvImgR,IplImage *openCvImgG,IplImage *openCvImgB,IplImage *openCvImgSum){
-	unsigned int valueR, valueB, valueG, sum;
-	unsigned int bFilteredValue, rFilteredValue, gFilteredValue;
-	float relSumPartB, relSumPartG, relSumPartR;
 
-	int i;
-	for(int w = 0; w < imageWidth_; w++){
-		for(int h = 0; h < imageHeight_; h++){
+void updateMonitor(IplImage *openCvImgMonitor,  unsigned char *imgD){
 
-			i = ((imageWidth_*h) + w);
-			valueR = (unsigned int) rawImageData_[3*i];
-			valueG = (unsigned int) rawImageData_[3*i+1];
-			valueB = (unsigned int) rawImageData_[3*i+2];
-
-			if( ( valueR > rFilterThreshR_ ) &&
-					( valueG < rFilterThreshG_ ) &&
-					( valueB < rFilterThreshB_ )    ){
-				rFilteredValue = valueR ;
-			}else{
-				rFilteredValue = 0;
-			};
-			if( ( valueG > gFilterThreshG_ ) &&
-					( valueR < gFilterThreshR_ ) &&
-					( valueB < gFilterThreshB_ )    ){
-				gFilteredValue = valueG ;
-			}else{
-				gFilteredValue = 0;
-			};
-			if( ( valueB > bFilterThreshB_ ) &&
-					( valueG < bFilterThreshG_ ) &&
-					( valueR < bFilterThreshR_ )    ){
-				bFilteredValue = valueB ;
-			}else{
-				bFilteredValue = 0;
-			};
-
-			((uchar *)(openCvImgR->imageData + h*openCvImgR->widthStep))[w] = rFilteredValue;
-			((uchar *)(openCvImgG->imageData + h*openCvImgG->widthStep))[w] = gFilteredValue;
-			((uchar *)(openCvImgB->imageData + h*openCvImgB->widthStep))[w] = bFilteredValue;
-
-			relSumPartB = (((float) sumPartB_)/100.0 )*((float) bFilteredValue);
-			relSumPartG = (((float) sumPartG_)/100.0 )*((float) gFilteredValue);
-			relSumPartR = (((float) sumPartR_)/100.0 )*((float) rFilteredValue);
-			sum = (unsigned int) (relSumPartB + relSumPartG + relSumPartR + sumAdd_);
-			if(sum > 255) sum = 255;
-
-			((uchar *)(openCvImgSum->imageData + h*openCvImgSum->widthStep))[w] = sum;
-			sumFilterData_[i] = (unsigned char) sum;
+	/*
+	// transfer raw data into the monitor image data
+	for(int i = 0; i < imageHeight_; i++){
+		for(int j = 0; j < imageWidth_; j++){
+			((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j] =
+					((uchar *)(openCvImgRawData->imageData + i*openCvImgRawData->widthStep))[j];
 		};
 	};
+	*/
+
+	// write data into image structure to display image
+	for(int i = 0; i < imageHeight_; i++){
+		for(int j = 0; j < imageWidth_; j++){
+				((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j*openCvImgMonitor->nChannels + 0] =
+						imgD[(imageWidth_*i) + j]; // B
+				((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j*openCvImgMonitor->nChannels + 1] =
+						imgD[(imageWidth_*i) + j]; // G
+				((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j*openCvImgMonitor->nChannels + 2] =
+						imgD[(imageWidth_*i) + j]; // R
+		};
+	};
+
+
+	int value, w, h, maxH, minH, maxW, minW, meanW, meanH;
+
+	// find maximal height value
+	maxH = -1;
+	for(int i = 0; i < imageHeight_; i++){
+		for(int j = 0; j < imageWidth_; j++){
+			value = imgD[(imageWidth_*i) + j];
+			//value = ((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j];
+			if(value > detectTrash_){
+				cvCircle(openCvImgMonitor, cvPoint(j,i), 10, cvScalar(255,255,255), 2, 8);
+				w = j;
+				h = i;
+				maxH = h;
+				i=imageHeight_;
+				j=imageWidth_;
+			}
+		};
+	};
+
+	// find maximal height value
+	minH = -1;
+	for(int i =imageHeight_-1; i > -1; i--){
+		for(int j = imageWidth_; j > -1 ; j--){
+			value = imgD[(imageWidth_*i) + j];
+			//value = ((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j];
+			if(value > detectTrash_){
+				cvCircle(openCvImgMonitor, cvPoint(j,i), 10, cvScalar(255,255,255), 2, 8);
+				w = j;
+				h = i;
+				minH = h;
+				i=-1;
+				j=-1;
+			}
+		};
+	};
+
+
+	// find maximal width value
+	maxW = -1;
+	for(int i = 0; i < imageWidth_; i++){
+		for(int j = 0; j < imageHeight_; j++){
+			value = imgD[(imageWidth_*j) + i];
+			//value = ((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j];
+			if(value > detectTrash_){
+				cvCircle(openCvImgMonitor, cvPoint(i,j), 10, cvScalar(255,255,255), 2, 8);
+				h = j;
+				w = i;
+				maxW = w;
+				i=imageWidth_;
+				j=imageHeight_;
+			}
+		};
+	};
+
+	// find maximal width value
+	minW = -1;
+	for(int i = imageWidth_; i > -1 ; i--){
+		for(int j = imageHeight_; j > -1 ; j--){
+			value = imgD[(imageWidth_*j) + i];
+			//value = ((uchar *)(openCvImgMonitor->imageData + i*openCvImgMonitor->widthStep))[j];
+			if(value > detectTrash_){
+				cvCircle(openCvImgMonitor, cvPoint(i,j), 10, cvScalar(255,255,255), 2, 8);
+				h = j;
+				w = i;
+				minW = w;
+				i=-1;
+				j=-1;
+			}
+		};
+	};
+
+
+
+	cvLine(openCvImgMonitor, cvPoint(0,maxH),cvPoint(imageWidth_,maxH), cvScalar(255,0,0), 2, 8);
+	cvLine(openCvImgMonitor, cvPoint(0,minH),cvPoint(imageWidth_,minH), cvScalar(0,0,255), 2, 8);
+
+	cvLine(openCvImgMonitor, cvPoint(maxW,0),cvPoint(maxW, imageHeight_), cvScalar(255,0,0), 2, 8);
+	cvLine(openCvImgMonitor, cvPoint(minW,0),cvPoint(minW, imageHeight_), cvScalar(0,0,255), 2, 8);
+
+
+	if( ((maxW < 0) && (minW < 0)) ||
+		((maxH < 0) && (minH < 0))	){
+		blobCoord_[0] = 0;
+		blobCoord_[1] = 0;
+		blobCoord_[2] = 0;
+		blobCoord_[3] = 0;
+	}else{
+		if(maxW < minW){
+			int tmp;
+			tmp = maxW;
+			maxW = minW;
+			minW = tmp;
+		}
+		if(maxH < minH){
+			int tmp;
+			tmp = maxH;
+			maxH = minH;
+			minH = tmp;
+		}
+
+		meanW = ((maxW - minW) / 2) + minW;
+		meanH = ((maxH - minH) / 2) + minH;
+
+
+		blobCoord_[0] = ((int)0xFF)   & meanW;  // 1st 8 bits of meanW
+		blobCoord_[1] = (((int)0xFF00) & meanW) >> 8 ;  // 2nd 8 bits of meanW
+		blobCoord_[2] = ((int)0xFF)   & meanH;  // 1st 8 bits of meanH
+		blobCoord_[3] = (((int)0xFF00) & meanH) >> 8;  // 2nd 8 bits of meanH
+
+		cout << "width: " << meanW  << "    height: " << meanH << endl;
+
+		int bloobCoordWidth = 0;
+		int bloobCoordHight = 0;
+
+		bloobCoordWidth = (int) (blobCoord_[1]);
+		bloobCoordWidth = bloobCoordWidth << 8;
+		bloobCoordWidth = bloobCoordWidth   | ((int) blobCoord_[0]);
+
+		bloobCoordHight = (int) (blobCoord_[3]);
+		bloobCoordHight = bloobCoordHight << 8;
+		bloobCoordHight = bloobCoordHight   | ((int) blobCoord_[2]);
+
+		//printf("HEX: %08x \t-->\t %08x - %08x\n", meanW, blobCoord_[0], blobCoord_[1]);
+
+
+		//cout << "CALC: width: " << bloobCoordWidth  << "    height: " << bloobCoordHight << endl;
+
+	}
+
+
+
+
+
+	// find minimal height value
+
+
 };
 
-void createColorFilterWin(char color, char* winName,IplImage *openCvImg){
+void createMonitorWin(char* winName,IplImage *openCvImg){
 	cvNamedWindow(winName, 0);
 	cvShowImage(winName,openCvImg);
-	if(color == 'R'){
-		cvCreateTrackbar("R >",winName, &rFilterThreshR_, 255, NULL );
-		cvCreateTrackbar("G <",winName, &rFilterThreshG_, 255, NULL );
-		cvCreateTrackbar("B <",winName, &rFilterThreshB_, 255, NULL );
-	}else if(color == 'G'){
-		cvCreateTrackbar("G >",winName, &gFilterThreshG_, 255, NULL );
-		cvCreateTrackbar("R <",winName, &gFilterThreshR_, 255, NULL );
-		cvCreateTrackbar("B <",winName, &gFilterThreshB_, 255, NULL );
-	}else if(color == 'B'){
-		cvCreateTrackbar("B >",winName, &bFilterThreshB_, 255, NULL );
-		cvCreateTrackbar("R <",winName, &bFilterThreshR_, 255, NULL );
-		cvCreateTrackbar("G <",winName, &bFilterThreshG_, 255, NULL );
-	}else{
-		cvCreateTrackbar("rel. R-part" ,winName, &sumPartR_, 100, NULL );
-		cvCreateTrackbar("rel. G-part" ,winName, &sumPartG_, 100, NULL );
-		cvCreateTrackbar("rel. B-part" ,winName, &sumPartB_, 100, NULL );
-		cvCreateTrackbar("abs. Off-set",winName, &sumAdd_,   255, NULL );
-	};
 };
 
-int  sizeRawImageData(TCPSocket *socket, int *s, int *w, int *h){
+int  sizeRawImageData(TCPSocket *socket, int *s, int *w, int *h, int *color){
 	int rcvBufferSize = 124;
 	char echoBuffer[rcvBufferSize];
 	int bytesReceived = 0;
@@ -317,9 +392,9 @@ int  sizeRawImageData(TCPSocket *socket, int *s, int *w, int *h){
 
 	// interprete received data
 	char ch1,ch2,ch3,imageOrg;
-	int color, recvImageDataSize, nmbBytesTimeStamp;
+	int  recvImageDataSize, nmbBytesTimeStamp;
 	int nmbTokens = sscanf(echoBuffer,"[W=%d,H=%d,O=%c,C=%d,X=%c%c%c,B=%d,BTS=%d]",
-			w,h,&imageOrg,&color,&ch1,&ch2,&ch3,&recvImageDataSize,&nmbBytesTimeStamp);
+			w,h,&imageOrg,color,&ch1,&ch2,&ch3,&recvImageDataSize,&nmbBytesTimeStamp);
 	if(nmbTokens != 9){
 		cerr << "Can't interprete image meta data, terminate process.\n";
 		return (-1);
@@ -392,16 +467,16 @@ void HandleTCPClient(TCPSocket *sock){
     	// send meta data
     	echoMetaData[0]='\0';
     	sprintf(echoMetaData,"[W=%d,H=%d,O=%c,C=%d,X=%c%c%c,B=%d,BTS=%d]%c",
-    			imageWidth_,imageHeight_,'W',CAMERA_COLOR_,'R','G','B',imageWidth_*imageHeight_,0,'\0');
+    			blobCoordSize_,1,'W',0,'X','X','X',blobCoordSize_,0,'\0');
     	sock->send(echoMetaData,strlen(echoMetaData));
     }else if(!(strncmp("GET_IMAGE_DATA",revBuffer,strlen(GET_IMAGE_DATA)))){
     	// send image data
 		do{
 			if(!accessBlocked_){
-				sock->send(sumFilterData_,(imageWidth_*imageHeight_));
+				sock->send(blobCoord_,blobCoordSize_);
 				break;
 			}else{
-				cout << "access blocked continue request.\n";
+				//cout << "access blocked continue request.\n";
 			};
 		}while(true);
     }else if(!(strncmp(GET_VERSION,revBuffer,strlen(GET_VERSION)))){

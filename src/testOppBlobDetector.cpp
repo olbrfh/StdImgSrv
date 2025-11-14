@@ -5,12 +5,12 @@
  *      Author: aml
  */
 
-#include "Socket.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/Socket.H"  // For Socket, ServerSocket, and SocketException
 #include <iostream>           // For cerr and cout
 #include <cstdlib>            // For atoi()
 
-#include "StdImgDataServerProtocol.H"
-#include "BlobDetector.H"
+#include "../include/StdImgDataServerProtocol.H"
+#include "../include/BlobDetector.H"
 
 unsigned short SOURCE_SERVER_PORT_;
 char          *SOURCE_SERVER_ADR_;

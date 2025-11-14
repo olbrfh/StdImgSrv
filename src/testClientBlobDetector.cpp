@@ -21,11 +21,11 @@
 */
 
 
-#include "Socket.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/Socket.H"  // For Socket, ServerSocket, and SocketException
 #include <iostream>           // For cerr and cout
 #include <cstdlib>            // For atoi()
 
-#include "StdImgDataServerProtocol.H"
+#include "../include/StdImgDataServerProtocol.H"
 
 //opencv
 #include <opencv2/opencv.hpp>

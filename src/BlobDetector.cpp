@@ -5,7 +5,7 @@
  *      Author: aml
  */
 
-#include "BlobDetector.H"
+#include "../include/BlobDetector.H"
 
 #include <string>
 #include <iostream>

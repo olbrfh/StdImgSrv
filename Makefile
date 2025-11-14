@@ -26,62 +26,62 @@ TARGETS = stdImgDataServerSim  testClient stdImgDataServerLapCam stdImgDataServe
 all:	$(TARGETS)
 
 
-Socket.o:	Socket.C
+Socket.o:	./src/Socket.cpp
 	$(CC) $(CFLAGS) $(INCL) -g -DLINUX -D__LINUX__ -DUNIX -c $<
 
-stdImgDataServerSim.o:	stdImgDataServerSim.C  StdImgDataServerProtocol.H
+stdImgDataServerSim.o:	./src/stdImgDataServerSim.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT -c $<
 
-stdImgDataServerLapCam.o:	stdImgDataServerLapCam.C  StdImgDataServerProtocol.H
+stdImgDataServerLapCam.o:	./src/stdImgDataServerLapCam.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT -c $<
 
-stdImgDataServerClientColorFilter.o:	stdImgDataServerClientColorFilter.C  StdImgDataServerProtocol.H
+stdImgDataServerClientColorFilter.o:	./src/stdImgDataServerClientColorFilter.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT -c $<
 	
-stdImgDataServerClientBlobDetector.o:	stdImgDataServerClientBlobDetector.C  StdImgDataServerProtocol.H
+stdImgDataServerClientBlobDetector.o:	./src/stdImgDataServerClientBlobDetector.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT -c $<	
 
-BlobDetector.o:	BlobDetector.C  BlobDetector.H StdImgDataServerProtocol.H
+BlobDetector.o:	./src/BlobDetector.cpp  ./include/BlobDetector.H ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT -c $<	
 
-testClient.o:	testClient.C  StdImgDataServerProtocol.H
+testClient.o:	./src/testClient.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT   -c $<
 
-testClientBlobDetector.o:	testClientBlobDetector.C  StdImgDataServerProtocol.H
+testClientBlobDetector.o:	./src/testClientBlobDetector.cpp  ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT   -c $<
 	
-testOppBlobDetector.o:	testOppBlobDetector.C BlobDetector.C BlobDetector.H
+testOppBlobDetector.o:	./src/testOppBlobDetector.cpp ./src/BlobDetector.cpp ./include/BlobDetector.H
 	$(CC) $(CFLAGS) $(INCL)   -g -DLINUX -D__LINUX__ -DUNIX -D_REENTRANT   -c $<
 
-stdImgDataServerSim: Socket.o stdImgDataServerSim.o StdImgDataServerProtocol.H
+stdImgDataServerSim: Socket.o stdImgDataServerSim.o ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS) $(INCL) -I/usr/local/lib   \
 	-lpthread -D_REENTRANT \
 	-lm -lstdc++  Socket.o  -lpthread \
 	stdImgDataServerSim.o -o stdImgDataServerSim
 	
-stdImgDataServerLapCam: Socket.o stdImgDataServerLapCam.o StdImgDataServerProtocol.H
+stdImgDataServerLapCam: Socket.o stdImgDataServerLapCam.o ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  stdImgDataServerLapCam.o -o stdImgDataServerLapCam   \
 	$(LIBS) -lpthread -D_REENTRANT \
 	-lm -lstdc++  Socket.o  -lpthread  
 		
 
-stdImgDataServerClientColorFilter: Socket.o stdImgDataServerClientColorFilter.o StdImgDataServerProtocol.H
+stdImgDataServerClientColorFilter: Socket.o stdImgDataServerClientColorFilter.o ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  stdImgDataServerClientColorFilter.o -o stdImgDataServerClientColorFilter   \
 	$(LIBS) -lpthread -D_REENTRANT \
 	-lm -lstdc++  Socket.o  -lpthread 
 
-stdImgDataServerClientBlobDetector: Socket.o stdImgDataServerClientBlobDetector.o StdImgDataServerProtocol.H
+stdImgDataServerClientBlobDetector: Socket.o stdImgDataServerClientBlobDetector.o ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  stdImgDataServerClientBlobDetector.o -o stdImgDataServerClientBlobDetector   \
 	$(LIBS) -lpthread -D_REENTRANT \
 	-lm -lstdc++  Socket.o  -lpthread 
 
-testClient: testClient.o Socket.o testClient.C StdImgDataServerProtocol.H
+testClient: testClient.o Socket.o ./src/testClient.cpp ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  testClient.o Socket.o -o testClient $(LIBS) -ldl -lstdc++ -lm -std=c++11 \
 	
-testClientBlobDetector:	testClientBlobDetector.o Socket.o testClientBlobDetector.C StdImgDataServerProtocol.H
+testClientBlobDetector:	testClientBlobDetector.o Socket.o ./src/testClientBlobDetector.cpp ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  testClientBlobDetector.o Socket.o -o testClientBlobDetector $(LIBS) -ldl -lstdc++ -lm -std=c++11 \
 
-testOppBlobDetector:	testOppBlobDetector.o Socket.o BlobDetector.o StdImgDataServerProtocol.H
+testOppBlobDetector:	testOppBlobDetector.o Socket.o BlobDetector.o ./include/StdImgDataServerProtocol.H
 	$(CC) $(CFLAGS)  testOppBlobDetector.o Socket.o BlobDetector.o  -o testOppBlobDetector $(LIBS) -ldl -lstdc++ -lm -std=c++11 \
 
 

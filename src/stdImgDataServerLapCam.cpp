@@ -45,8 +45,8 @@
 using namespace cv;
 
 // communication
-#include "Socket.H"  // For Socket, ServerSocket, and SocketException
-#include "StdImgDataServerProtocol.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/Socket.H"  // For Socket, ServerSocket, and SocketException
+#include "../include/StdImgDataServerProtocol.H"  // For Socket, ServerSocket, and SocketException
 
 
 
